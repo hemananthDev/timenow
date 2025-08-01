@@ -17,12 +17,13 @@ venv/
 *.tfstate
 *.tfstate.*
 .terraform/
+terraform.tfvars
+terraform.tfvars.json
 crash.log
 override.tf
 override.tf.json
-terraform.tfvars
-terraform.tfvars.json
-.plan
+*.backup
+.terraform.lock.hcl
 
 # AWS credentials (never commit these!)
 *.pem
@@ -41,3 +42,5 @@ terraform.tfvars.json
 # OS-generated files
 .DS_Store
 Thumbs.db
+
+
