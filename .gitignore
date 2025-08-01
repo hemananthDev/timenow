@@ -1,0 +1,43 @@
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+venv/
+.env
+.env.*
+
+# Local dev files
+*.log
+*.sqlite3
+*.db
+
+# Terraform files
+*.tfstate
+*.tfstate.*
+.terraform/
+crash.log
+override.tf
+override.tf.json
+terraform.tfvars
+terraform.tfvars.json
+.plan
+
+# AWS credentials (never commit these!)
+*.pem
+*.key
+*.crt
+
+# Docker
+*.tar
+*.imgad
+.dockerignore
+
+# VSCode/JetBrains settings
+.vscode/
+.idea/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
