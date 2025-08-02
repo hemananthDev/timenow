@@ -1,6 +1,6 @@
 provider "aws" {
   profile = "eks-account"
-  region  = "ap-south-1" # Change to your preferred region
+  region  = "ap-south-1"
 }
 
 # Create IAM role for the EC2 instance
@@ -21,52 +21,7 @@ resource "aws_iam_role" "builder_node_role" {
   })
 }
 
-# Attach required policies to the IAM role
-resource "aws_iam_role_policy_attachment" "ecr_full_access" {
-  role       = aws_iam_role.builder_node_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
-}
-
-resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
-  role       = aws_iam_role.builder_node_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-}
-
-resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
-  role       = aws_iam_role.builder_node_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-}
-
-resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
-  role       = aws_iam_role.builder_node_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-}
-
-resource "aws_iam_role_policy_attachment" "s3_read_only" {
-  role       = aws_iam_role.builder_node_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
-}
-
-resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
-  role       = aws_iam_role.builder_node_role.name
-  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
-}
-
-resource "aws_iam_role_policy_attachment" "ec2_read_only" {
-  role       = aws_iam_role.builder_node_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
-}
-
-resource "aws_iam_role_policy_attachment" "iam_read_only" {
-  role       = aws_iam_role.builder_node_role.name
-  policy_arn = "arn:aws:iam::aws:policy/IAMReadOnlyAccess"
-}
-
-resource "aws_iam_role_policy_attachment" "secrets_manager" {
-  role       = aws_iam_role.builder_node_role.name
-  policy_arn = "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
-}
-
+# Attach all required policies to the IAM role
 resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
   role       = aws_iam_role.builder_node_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
@@ -85,6 +40,27 @@ resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
 resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
   role       = aws_iam_role.builder_node_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+}
+
+# Additional policies from original configuration
+resource "aws_iam_role_policy_attachment" "s3_read_only" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_read_only" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "iam_read_only" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/IAMReadOnlyAccess"
 }
 
 # Create IAM instance profile
@@ -161,7 +137,7 @@ data "aws_ami" "ubuntu" {
 
 resource "aws_instance" "builder_node" {
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "t3.medium" # Change as needed
+  instance_type          = "t3.medium"
   key_name               = "EKS_SSH_Key"
   vpc_security_group_ids = [aws_security_group.builder_node_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.builder_node_profile.name
@@ -171,7 +147,7 @@ resource "aws_instance" "builder_node" {
   }
 
   root_block_device {
-    volume_size = 30 # GB, adjust as needed
+    volume_size = 30
     volume_type = "gp2"
   }
 
@@ -180,4 +156,13 @@ resource "aws_instance" "builder_node" {
               apt-get update -y
               apt-get upgrade -y
               EOF
+}
+
+# Output useful information
+output "builder_node_public_ip" {
+  value = aws_instance.builder_node.public_ip
+}
+
+output "builder_node_private_ip" {
+  value = aws_instance.builder_node.private_ip
 }
