@@ -67,6 +67,26 @@ resource "aws_iam_role_policy_attachment" "secrets_manager" {
   policy_arn = "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
 }
 
+resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "ecr_read_only" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+}
+
+resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+}
+
 # Create IAM instance profile
 resource "aws_iam_instance_profile" "builder_node_profile" {
   name = "Builder_Node_Profile"
