@@ -1,6 +1,8 @@
 provider "aws" {
-  region = "ap-south-1" # change if needed
+  region  = "ap-south-1"
+  profile = "eks-account"  # <-- your named profile
 }
+
 
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
