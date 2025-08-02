@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: time-now-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: time-now
+  template:
+    metadata:
+      labels:
+        app: time-now
+    spec:
+      containers:
+        - name: flask-container
+          image: 416430292789.dkr.ecr.ap-south-1.amazonaws.com/time-now-flask:latest
+          ports:
+            - containerPort: 5000
