@@ -1,95 +1,163 @@
 provider "aws" {
-  region  = "ap-south-1"
   profile = "eks-account"
+  region  = "ap-south-1" # Change to your preferred region
 }
 
-data "aws_vpc" "default" {
-  default = true
-}
-
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
-}
-
-resource "aws_iam_role" "eks_cluster_role" {
-  name = "eks-cluster-role"
+# Create IAM role for the EC2 instance
+resource "aws_iam_role" "builder_node_role" {
+  name = "Builder_Node_Role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = { Service = "eks.amazonaws.com" }
-      Action = "sts:AssumeRole"
-    }]
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
   })
 }
 
-resource "aws_iam_role_policy_attachment" "eks_cluster_AmazonEKSClusterPolicy" {
-  role       = aws_iam_role.eks_cluster_role.name
+# Attach required policies to the IAM role
+resource "aws_iam_role_policy_attachment" "ecr_full_access" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
+  role       = aws_iam_role.builder_node_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
-resource "aws_eks_cluster" "eks" {
-  name     = "simple-eks"
-  role_arn = aws_iam_role.eks_cluster_role.arn
-
-  vpc_config {
-    subnet_ids = data.aws_subnets.default.ids
-  }
-
-  depends_on = [aws_iam_role_policy_attachment.eks_cluster_AmazonEKSClusterPolicy]
-}
-
-resource "aws_iam_role" "eks_node_role" {
-  name = "eks-node-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = { Service = "ec2.amazonaws.com" }
-      Action = "sts:AssumeRole"
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "node_AmazonEKSWorkerNodePolicy" {
-  role       = aws_iam_role.eks_node_role.name
+resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
+  role       = aws_iam_role.builder_node_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
 }
 
-resource "aws_iam_role_policy_attachment" "node_ECR" {
-  role       = aws_iam_role.eks_node_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-}
-
-resource "aws_iam_role_policy_attachment" "node_CNI" {
-  role       = aws_iam_role.eks_node_role.name
+resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
+  role       = aws_iam_role.builder_node_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
 }
 
-resource "aws_eks_node_group" "node_group" {
-  cluster_name    = aws_eks_cluster.eks.name
-  node_group_name = "demo-nodes"
-  node_role_arn   = aws_iam_role.eks_node_role.arn
-  subnet_ids      = data.aws_subnets.default.ids
-
-  scaling_config {
-    desired_size = 1
-    max_size     = 2
-    min_size     = 1
-  }
-
-  instance_types = ["t3.micro"]
-  disk_size      = 20  # <-- updated from 10 to 20
-
-  depends_on = [
-    aws_iam_role_policy_attachment.node_AmazonEKSWorkerNodePolicy,
-    aws_iam_role_policy_attachment.node_ECR,
-    aws_iam_role_policy_attachment.node_CNI
-  ]
+resource "aws_iam_role_policy_attachment" "s3_read_only" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
 }
 
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_read_only" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "iam_read_only" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/IAMReadOnlyAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "secrets_manager" {
+  role       = aws_iam_role.builder_node_role.name
+  policy_arn = "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
+}
+
+# Create IAM instance profile
+resource "aws_iam_instance_profile" "builder_node_profile" {
+  name = "Builder_Node_Profile"
+  role = aws_iam_role.builder_node_role.name
+}
+
+# Create security group with required inbound rules
+resource "aws_security_group" "builder_node_sg" {
+  name        = "Builder_Node_SG"
+  description = "Security group for Builder Node EC2 instance"
+
+  ingress {
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Restrict this to your IP in production
+  }
+
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Port 8080"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "Builder_Node_SG"
+  }
+}
+
+# Launch EC2 instance with Ubuntu
+data "aws_ami" "ubuntu" {
+  most_recent = true
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  owners = ["099720109477"] # Canonical
+}
+
+resource "aws_instance" "builder_node" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = "t3.medium" # Change as needed
+  key_name               = "EKS_SSH_Key"
+  vpc_security_group_ids = [aws_security_group.builder_node_sg.id]
+  iam_instance_profile   = aws_iam_instance_profile.builder_node_profile.name
+
+  tags = {
+    Name = "Builder_Node"
+  }
+
+  root_block_device {
+    volume_size = 30 # GB, adjust as needed
+    volume_type = "gp2"
+  }
+
+  user_data = <<-EOF
+              #!/bin/bash
+              apt-get update -y
+              apt-get upgrade -y
+              EOF
+}
