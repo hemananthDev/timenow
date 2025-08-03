@@ -1,12 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: time-now-service
+  name: timenow-service
 spec:
-  selector:
-    app: time-now
   type: LoadBalancer
+  selector:
+    app: timenow
   ports:
-    - protocol: TCP
-      port: 80
+    - port: 80
       targetPort: 5000
