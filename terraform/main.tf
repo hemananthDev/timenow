@@ -3,20 +3,27 @@ provider "aws" {
   region  = "ap-south-1"
 }
 
-# Get default VPC and subnet
+# Get default VPC
 data "aws_vpc" "default" {
   default = true
 }
 
-data "aws_subnets" "default" {
+# Get list of all availability zones in the region
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+# Get supported subnets in ap-south-1 (excluding problematic ones)
+data "aws_subnets" "supported" {
   filter {
     name   = "vpc-id"
     values = [data.aws_vpc.default.id]
   }
 
+  # Filter out ap-south-1c if it exists in the available AZs
   filter {
-    name   = "default-for-az"
-    values = ["true"]
+    name   = "availability-zone"
+    values = [for az in data.aws_availability_zones.available.names : az if az != "ap-south-1c"]
   }
 }
 
@@ -66,7 +73,7 @@ resource "aws_security_group" "eks_cluster_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Internal cluster traffic - allow all traffic from instances with this SG
+  # Internal cluster traffic
   ingress {
     from_port = 0
     to_port   = 0
@@ -87,13 +94,23 @@ resource "aws_security_group" "eks_cluster_sg" {
   }
 }
 
-# EC2 instances
+# Find available instance types in the region
+data "aws_ec2_instance_type_offerings" "supported" {
+  filter {
+    name   = "instance-type"
+    values = ["t2.medium", "t3.medium"] # Try both options
+  }
+
+  location_type = "availability-zone"
+}
+
+# EC2 instances - using supported instance types and subnets
 resource "aws_instance" "jenkins_builder" {
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "t2.medium"
-  key_name               = "EKS_SSH_Key"  # Updated key name
+  instance_type          = contains(data.aws_ec2_instance_type_offerings.supported.instance_types, "t2.medium") ? "t2.medium" : "t3.medium"
+  key_name               = "EKS_SSH_Key"
   vpc_security_group_ids = [aws_security_group.eks_cluster_sg.id]
-  subnet_id              = data.aws_subnets.default.ids[0]
+  subnet_id              = data.aws_subnets.supported.ids[0]
 
   tags = {
     Name = "jenkins-builder"
@@ -103,10 +120,10 @@ resource "aws_instance" "jenkins_builder" {
 
 resource "aws_instance" "k8s_master" {
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "t2.medium"
-  key_name               = "EKS_SSH_Key"  # Updated key name
+  instance_type          = contains(data.aws_ec2_instance_type_offerings.supported.instance_types, "t2.medium") ? "t2.medium" : "t3.medium"
+  key_name               = "EKS_SSH_Key"
   vpc_security_group_ids = [aws_security_group.eks_cluster_sg.id]
-  subnet_id              = data.aws_subnets.default.ids[0]
+  subnet_id              = data.aws_subnets.supported.ids[0]
 
   tags = {
     Name = "k8s-master"
@@ -116,10 +133,10 @@ resource "aws_instance" "k8s_master" {
 
 resource "aws_instance" "k8s_worker" {
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "t2.medium"
-  key_name               = "EKS_SSH_Key"  # Updated key name
+  instance_type          = contains(data.aws_ec2_instance_type_offerings.supported.instance_types, "t2.medium") ? "t2.medium" : "t3.medium"
+  key_name               = "EKS_SSH_Key"
   vpc_security_group_ids = [aws_security_group.eks_cluster_sg.id]
-  subnet_id              = data.aws_subnets.default.ids[0]
+  subnet_id              = data.aws_subnets.supported.ids[0]
 
   tags = {
     Name = "k8s-worker"
@@ -150,4 +167,12 @@ output "instance_public_ips" {
     k8s_master      = aws_instance.k8s_master.public_ip
     k8s_worker      = aws_instance.k8s_worker.public_ip
   }
+}
+
+output "used_instance_type" {
+  value = contains(data.aws_ec2_instance_type_offerings.supported.instance_types, "t2.medium") ? "t2.medium" : "t3.medium"
+}
+
+output "used_subnet" {
+  value = data.aws_subnets.supported.ids[0]
 }
