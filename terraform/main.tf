@@ -91,7 +91,7 @@ resource "aws_security_group" "eks_cluster_sg" {
 resource "aws_instance" "jenkins_builder" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t2.medium"
-  key_name               = "EKS-SSH"
+  key_name               = "EKS_SSH_Key"  # Updated key name
   vpc_security_group_ids = [aws_security_group.eks_cluster_sg.id]
   subnet_id              = data.aws_subnets.default.ids[0]
 
@@ -104,7 +104,7 @@ resource "aws_instance" "jenkins_builder" {
 resource "aws_instance" "k8s_master" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t2.medium"
-  key_name               = "EKS-SSH"
+  key_name               = "EKS_SSH_Key"  # Updated key name
   vpc_security_group_ids = [aws_security_group.eks_cluster_sg.id]
   subnet_id              = data.aws_subnets.default.ids[0]
 
@@ -117,7 +117,7 @@ resource "aws_instance" "k8s_master" {
 resource "aws_instance" "k8s_worker" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = "t2.medium"
-  key_name               = "EKS-SSH"
+  key_name               = "EKS_SSH_Key"  # Updated key name
   vpc_security_group_ids = [aws_security_group.eks_cluster_sg.id]
   subnet_id              = data.aws_subnets.default.ids[0]
 
